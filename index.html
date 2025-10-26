@@ -606,21 +606,35 @@
                 }
             }
 
+            isStorageAvailable() {
+                return typeof window.storage !== 'undefined' && 
+                       typeof window.storage.get === 'function' && 
+                       typeof window.storage.set === 'function';
+            }
+
             async loadData() {
                 try {
                     this.updateDebug('Завантаження даних...');
                     
-                    let result = null;
-                    try {
-                        result = await window.storage.get('pointsSystem', false);
-                    } catch (getError) {
-                        console.log('Ключ не знайдено (перший запуск)');
-                        result = null;
+                    let allData = null;
+                    
+                    if (this.isStorageAvailable()) {
+                        try {
+                            const result = await window.storage.get('pointsSystem', false);
+                            if (result && result.value) {
+                                allData = JSON.parse(result.value);
+                            }
+                        } catch (getError) {
+                            console.log('Ключ не знайдено (перший запуск)');
+                        }
+                    } else {
+                        const stored = localStorage.getItem('pointsSystem');
+                        if (stored) {
+                            allData = JSON.parse(stored);
+                        }
                     }
                     
-                    if (result && result.value) {
-                        const allData = JSON.parse(result.value);
-                        
+                    if (allData) {
                         if (allData.userName) {
                             this.userName = allData.userName;
                             this.updateTableTitle();
@@ -663,16 +677,21 @@
                     
                     console.log('Спроба збереження:', allData);
                     
-                    const result = await window.storage.set('pointsSystem', JSON.stringify(allData), false);
-                    
-                    console.log('Результат збереження:', result);
-                    
-                    if (result && result.key === 'pointsSystem') {
-                        console.log('✅ Збережено успішно');
-                        return true;
+                    if (this.isStorageAvailable()) {
+                        const result = await window.storage.set('pointsSystem', JSON.stringify(allData), false);
+                        console.log('Результат збереження:', result);
+                        
+                        if (result && result.key === 'pointsSystem') {
+                            console.log('✅ Збережено успішно (window.storage)');
+                            return true;
+                        } else {
+                            console.error('❌ Некоректний результат:', result);
+                            return false;
+                        }
                     } else {
-                        console.error('❌ Некоректний результат:', result);
-                        return false;
+                        localStorage.setItem('pointsSystem', JSON.stringify(allData));
+                        console.log('✅ Збережено успішно (localStorage)');
+                        return true;
                     }
                 } catch (error) {
                     console.error('❌ Помилка збереження:', error);
